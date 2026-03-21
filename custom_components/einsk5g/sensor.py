@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfEnergy, UnitOfPower
+from homeassistant.const import PERCENTAGE, UnitOfEnergy, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -130,7 +130,12 @@ class EinsK5GPowerSensor(EinsK5GSensorBase):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the unit of measurement."""
-        return UnitOfPower.WATT
+        unit = self._config.get("unit", "W")
+        if unit == "%":
+            return PERCENTAGE
+        elif unit == "W":
+            return UnitOfPower.WATT
+        return unit
 
 
 class EinsK5GEnergySensor(EinsK5GSensorBase):
