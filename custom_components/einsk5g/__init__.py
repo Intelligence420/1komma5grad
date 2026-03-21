@@ -80,3 +80,34 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Reload config entry."""
     await async_unload_entry(hass, entry)
     await async_setup_entry(hass, entry)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove a config entry and clean up all associated data."""
+    # Clean up any remaining data
+    if DOMAIN in hass.data and entry.entry_id in hass.data[DOMAIN]:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+
+    # Clean up device and entity registry entries
+    from homeassistant.helpers import device_registry as dr, entity_registry as er
+
+    device_registry = dr.async_get(hass)
+    entity_registry = er.async_get(hass)
+
+    # Get the system_id from entry data
+    system_id = entry.data.get("system_id")
+
+    if system_id:
+        # Remove device
+        device = device_registry.async_get_device(identifiers={(DOMAIN, system_id)})
+        if device:
+            device_registry.async_remove_device(device.id)
+
+    # Remove all entities for this config entry
+    entities_to_remove = [
+        entity.entity_id
+        for entity in entity_registry.entities.values()
+        if entity.config_entry_id == entry.entry_id
+    ]
+    for entity_id in entities_to_remove:
+        entity_registry.async_remove(entity_id)
