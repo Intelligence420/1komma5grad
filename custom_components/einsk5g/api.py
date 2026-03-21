@@ -283,14 +283,28 @@ class EinsK5GApi:
         return await self._api_request("GET", url)
 
     async def get_systems(self) -> list[dict[str, Any]]:
-        """Get all systems for the user."""
+        """Get all systems for the user.
+
+        Returns systems sorted so that real systems come before the demo system.
+        The demo system has ID '00000000-0000-0000-0000-000000000000'.
+        """
         url = f"{HEARTBEAT_URL}/api/v2/systems"
         result = await self._api_request("GET", url)
 
         # Handle paginated response
         if isinstance(result, dict) and "data" in result:
-            return result["data"]
-        return result if isinstance(result, list) else [result]
+            systems = result["data"]
+        else:
+            systems = result if isinstance(result, list) else [result]
+
+        # Filter out demo system if there are other systems available
+        demo_system_id = "00000000-0000-0000-0000-000000000000"
+        real_systems = [s for s in systems if s.get("id") != demo_system_id]
+
+        # Return real systems first, or demo system if no real systems exist
+        if real_systems:
+            return real_systems
+        return systems
 
     async def get_system_id(self) -> str:
         """Get the first system ID."""
