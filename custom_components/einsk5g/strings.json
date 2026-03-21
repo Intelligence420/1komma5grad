@@ -1,0 +1,92 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "1KOMMA5GRAD Anmeldung",
+        "description": "Gib deine 1KOMMA5GRAD App Zugangsdaten ein.",
+        "data": {
+          "username": "E-Mail",
+          "password": "Passwort"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Erneute Authentifizierung erforderlich",
+        "description": "Die Zugangsdaten sind nicht mehr gueltig. Bitte gib deine neuen Zugangsdaten ein.",
+        "data": {
+          "username": "E-Mail",
+          "password": "Passwort"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Ungueltige Zugangsdaten",
+      "no_systems": "Kein System gefunden. Bitte stelle sicher, dass dein System in der 1KOMMA5GRAD App eingerichtet ist.",
+      "unknown": "Unbekannter Fehler"
+    },
+    "abort": {
+      "already_configured": "Dieses System ist bereits konfiguriert",
+      "reauth_successful": "Erneute Authentifizierung erfolgreich"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "photovoltaic": {
+        "name": "Photovoltaik"
+      },
+      "grid_consumption": {
+        "name": "Netzbezug"
+      },
+      "grid_feedin": {
+        "name": "Netzeinspeisung"
+      },
+      "battery": {
+        "name": "Batterie"
+      },
+      "battery_soc": {
+        "name": "Batterie Ladestand"
+      },
+      "heat_pump": {
+        "name": "Waermepumpe"
+      },
+      "wallbox": {
+        "name": "Wallbox"
+      },
+      "household": {
+        "name": "Haushalt"
+      },
+      "total_consumption": {
+        "name": "Gesamtverbrauch"
+      },
+      "self_consumption_rate": {
+        "name": "Eigenverbrauchsquote"
+      },
+      "autarky_rate": {
+        "name": "Autarkiegrad"
+      },
+      "photovoltaic_energy": {
+        "name": "Photovoltaik Energie"
+      },
+      "grid_consumption_energy": {
+        "name": "Netzbezug Energie"
+      },
+      "grid_feedin_energy": {
+        "name": "Netzeinspeisung Energie"
+      },
+      "battery_charge_energy": {
+        "name": "Batterie Ladung"
+      },
+      "battery_discharge_energy": {
+        "name": "Batterie Entladung"
+      },
+      "heat_pump_energy": {
+        "name": "Waermepumpe Energie"
+      },
+      "wallbox_energy": {
+        "name": "Wallbox Energie"
+      },
+      "household_energy": {
+        "name": "Haushalt Energie"
+      }
+    }
+  }
+}
