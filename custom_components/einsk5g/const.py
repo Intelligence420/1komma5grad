@@ -14,7 +14,7 @@ CLIENT_ID = "zJTm6GFGM5zHcmpl07xTsi6MP0TwRAw6"
 AUTH0_CLIENT = "eyJuYW1lIjoiYXV0aDAtc3BhLWpzIiwidmVyc2lvbiI6IjIuMC44In0="
 
 # Update interval
-SCAN_INTERVAL = timedelta(seconds=30)
+SCAN_INTERVAL = timedelta(seconds=10)
 HISTORY_SCAN_INTERVAL = timedelta(hours=1)
 
 # Config keys
