@@ -1,7 +1,10 @@
 """API client for 1KOMMA5GRAD."""
 from __future__ import annotations
 
+import base64
+import hashlib
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -72,106 +75,137 @@ class EinsK5GApi:
             "x-platform": "web",
         }
 
+    def _generate_pkce(self) -> tuple[str, str]:
+        """Generate PKCE code verifier and challenge."""
+        # Generate a random code verifier (43-128 characters)
+        code_verifier = base64.urlsafe_b64encode(os.urandom(32)).decode("utf-8").rstrip("=")
+
+        # Create code challenge using SHA256
+        code_challenge = base64.urlsafe_b64encode(
+            hashlib.sha256(code_verifier.encode("utf-8")).digest()
+        ).decode("utf-8").rstrip("=")
+
+        return code_verifier, code_challenge
+
     async def authenticate(self) -> bool:
         """Authenticate with the API and get access token."""
-        session = await self._get_session()
+        # Create a new session with cookie jar for auth flow
+        jar = aiohttp.CookieJar()
+        async with aiohttp.ClientSession(cookie_jar=jar) as auth_session:
+            try:
+                # Generate PKCE codes
+                code_verifier, code_challenge = self._generate_pkce()
 
-        try:
-            # Step 1: Get initial state from authorize endpoint
-            authorize_url = (
-                f"{AUTH_URL}/authorize?"
-                f"client_id={CLIENT_ID}&"
-                f"response_type=code&"
-                f"response_mode=query&"
-                f"auth0Client={AUTH0_CLIENT}"
-            )
+                # Step 1: Get initial state from authorize endpoint
+                authorize_url = (
+                    f"{AUTH_URL}/authorize?"
+                    f"client_id={CLIENT_ID}&"
+                    f"response_type=code&"
+                    f"response_mode=query&"
+                    f"redirect_uri=https://app.1komma5grad.com&"
+                    f"code_challenge={code_challenge}&"
+                    f"code_challenge_method=S256&"
+                    f"auth0Client={AUTH0_CLIENT}"
+                )
 
-            async with session.get(
-                authorize_url,
-                headers={"host": "auth.1komma5grad.com"},
-                allow_redirects=False,
-            ) as response:
-                text = await response.text()
-                state = self._extract_state(text)
+                async with auth_session.get(
+                    authorize_url,
+                    allow_redirects=True,
+                ) as response:
+                    text = await response.text()
+                    # Extract state from form or URL
+                    state = self._extract_state_from_form(text)
+                    if not state:
+                        state = self._extract_state(str(response.url))
 
-                if not state:
-                    raise EinsK5GAuthError("Could not extract state from auth response")
+                    if not state:
+                        raise EinsK5GAuthError("Could not extract state from auth response")
 
-            # Step 2: Submit login credentials
-            login_url = f"{AUTH_URL}/u/login?state={state}&ui_locales=de"
-            login_payload = {
-                "password": self._password,
-                "state": state,
-                "username": self._username,
-            }
+                # Step 2: Submit login credentials
+                login_url = f"{AUTH_URL}/u/login?state={state}"
+                login_payload = {
+                    "password": self._password,
+                    "state": state,
+                    "username": self._username,
+                    "action": "default",
+                }
 
-            async with session.post(
-                login_url,
-                data=login_payload,
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-                allow_redirects=False,
-            ) as response:
-                text = await response.text()
-                authorize_path = self._extract_authorize_path(text)
+                async with auth_session.post(
+                    login_url,
+                    data=login_payload,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    allow_redirects=False,
+                ) as response:
+                    if response.status != 302:
+                        raise EinsK5GAuthError("Login failed - invalid credentials")
 
-                if not authorize_path:
-                    raise EinsK5GAuthError("Login failed - invalid credentials")
+                    location = response.headers.get("Location", "")
 
-            # Step 3: Complete authorization flow
-            full_authorize_url = f"{AUTH_URL}{authorize_path}"
+                    if "error" in location.lower():
+                        raise EinsK5GAuthError("Login failed - invalid credentials")
 
-            async with session.get(
-                full_authorize_url,
-                allow_redirects=False,
-            ) as response:
-                location = response.headers.get("Location", "")
-                code = self._extract_code(location)
+                # Step 3: Follow redirect to get authorization code
+                resume_url = f"{AUTH_URL}{location}" if location.startswith("/") else location
 
-                if not code:
-                    raise EinsK5GAuthError("Could not extract authorization code")
+                async with auth_session.get(
+                    resume_url,
+                    allow_redirects=False,
+                ) as response:
+                    final_location = response.headers.get("Location", "")
+                    code = self._extract_code(final_location)
 
-            # Step 4: Exchange code for token
-            token_url = f"{AUTH_URL}/oauth/token"
-            token_payload = {
-                "grant_type": "authorization_code",
-                "client_id": CLIENT_ID,
-                "code": code,
-                "redirect_uri": "https://app.1komma5grad.com",
-            }
+                    if not code:
+                        if "error" in final_location:
+                            error_desc = re.search(r"error_description=([^&]+)", final_location)
+                            error_msg = error_desc.group(1) if error_desc else "Unknown error"
+                            raise EinsK5GAuthError(f"Authorization failed: {error_msg}")
+                        raise EinsK5GAuthError("Could not extract authorization code")
 
-            async with session.post(
-                token_url,
-                json=token_payload,
-                headers={"Content-Type": "application/json"},
-            ) as response:
-                if response.status != 200:
-                    raise EinsK5GAuthError("Failed to exchange code for token")
+                # Step 4: Exchange code for token (with PKCE verifier)
+                token_url = f"{AUTH_URL}/oauth/token"
+                token_payload = {
+                    "grant_type": "authorization_code",
+                    "client_id": CLIENT_ID,
+                    "code": code,
+                    "code_verifier": code_verifier,
+                    "redirect_uri": "https://app.1komma5grad.com",
+                }
 
-                data = await response.json()
-                self._access_token = data.get("access_token")
-                expires_in = data.get("expires_in", 86400)
-                self._token_expiry = datetime.now() + timedelta(seconds=expires_in - 60)
+                async with auth_session.post(
+                    token_url,
+                    json=token_payload,
+                    headers={"Content-Type": "application/json"},
+                ) as response:
+                    if response.status != 200:
+                        text = await response.text()
+                        raise EinsK5GAuthError(f"Failed to exchange code for token: {text}")
 
-                # Extract user_id from token claims
-                self._user_id = self._extract_user_id_from_token(self._access_token)
+                    data = await response.json()
+                    self._access_token = data.get("access_token")
+                    expires_in = data.get("expires_in", 86400)
+                    self._token_expiry = datetime.now() + timedelta(seconds=expires_in - 60)
 
-                _LOGGER.info("Successfully authenticated with 1KOMMA5GRAD API")
-                return True
+                    # Extract user_id from token claims
+                    self._user_id = self._extract_user_id_from_token(self._access_token)
 
-        except aiohttp.ClientError as err:
-            raise EinsK5GAuthError(f"Connection error during authentication: {err}") from err
+                    _LOGGER.info("Successfully authenticated with 1KOMMA5GRAD API")
+                    return True
+
+            except aiohttp.ClientError as err:
+                raise EinsK5GAuthError(f"Connection error during authentication: {err}") from err
 
     def _extract_state(self, text: str) -> str | None:
-        """Extract state parameter from response text."""
+        """Extract state parameter from URL or text."""
         match = re.search(r"state=([A-Za-z0-9_-]+)", text)
         return match.group(1) if match else None
 
-    def _extract_authorize_path(self, text: str) -> str | None:
-        """Extract authorize path from response text."""
-        if not text:
-            return None
-        idx = text.find("/authorize")
-        return text[idx:].split('"')[0].split("'")[0] if idx != -1 else None
+    def _extract_state_from_form(self, html: str) -> str | None:
+        """Extract state parameter from login form."""
+        match = re.search(r'name="state"\s+value="([^"]+)"', html)
+        if match:
+            return match.group(1)
+        match = re.search(r'value="([^"]+)"\s+name="state"', html)
+        return match.group(1) if match else None
 
     def _extract_code(self, location: str) -> str | None:
         """Extract authorization code from redirect location."""
@@ -252,6 +286,10 @@ class EinsK5GApi:
         """Get all systems for the user."""
         url = f"{HEARTBEAT_URL}/api/v2/systems"
         result = await self._api_request("GET", url)
+
+        # Handle paginated response
+        if isinstance(result, dict) and "data" in result:
+            return result["data"]
         return result if isinstance(result, list) else [result]
 
     async def get_system_id(self) -> str:

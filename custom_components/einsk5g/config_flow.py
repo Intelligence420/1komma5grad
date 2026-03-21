@@ -56,7 +56,7 @@ class EinsK5GConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 else:
                     system = systems[0]
                     system_id = system.get("id")
-                    system_name = system.get("name", "1KOMMA5GRAD")
+                    system_name = system.get("systemName", "1KOMMA5GRAD")
 
                     # Check for existing entry with same system
                     await self.async_set_unique_id(system_id)
