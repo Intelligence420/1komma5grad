@@ -93,12 +93,21 @@ class EinsK5GDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         result["grid_feedin"] = grid_feedin.get("value", 0) if isinstance(grid_feedin, dict) else grid_feedin
 
         # Battery from summaryCards
-        # Note: API returns negative values for charging, positive for discharging
-        # We invert this for Home Assistant (positive = charging, negative = discharging)
+        # API returns negative values for charging, positive for discharging
+        # Split into two sensors: battery_charge and battery_discharge (both positive)
         battery_data = summary_cards.get("battery", {})
         battery_power = battery_data.get("power", {})
         battery_value = battery_power.get("value", 0) if isinstance(battery_power, dict) else battery_power
-        result["battery"] = -battery_value  # Invert: positive = charging
+
+        # battery_charge: positive when charging (API value < 0)
+        # battery_discharge: positive when discharging (API value > 0)
+        if battery_value < 0:
+            result["battery_charge"] = abs(battery_value)
+            result["battery_discharge"] = 0
+        else:
+            result["battery_charge"] = 0
+            result["battery_discharge"] = battery_value
+
         # State of charge (convert from 0-1 to 0-100%)
         soc = battery_data.get("stateOfCharge", hero_view.get("totalStateOfCharge", 0))
         result["battery_soc"] = round(soc * 100, 1) if soc <= 1 else soc
