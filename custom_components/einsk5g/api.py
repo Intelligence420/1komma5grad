@@ -331,7 +331,7 @@ class EinsK5GApi:
         system_id: str | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
-        resolution: str = "day",
+        resolution: str = "15m",
     ) -> dict[str, Any]:
         """Get historical energy data.
 
@@ -339,7 +339,7 @@ class EinsK5GApi:
             system_id: System ID (uses default if not provided)
             start_date: Start date for history
             end_date: End date for history
-            resolution: Data resolution (15m, hour, day, month, year)
+            resolution: Data resolution (15m, hour, month, year)
         """
         if system_id is None:
             system_id = await self.get_system_id()

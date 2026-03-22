@@ -57,7 +57,7 @@ class EinsK5GDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         self.system_id,
                         start_date=today,
                         end_date=today,
-                        resolution="day",
+                        resolution="15m",  # API requires 15m, hour, month, or year
                     )
                     self._history_data = self._parse_history_data(history)
                     self._last_history_update = now
