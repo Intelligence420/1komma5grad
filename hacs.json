@@ -1,8 +1,6 @@
 {
   "name": "1KOMMA5GRAD",
+  "content_in_root": false,
   "render_readme": true,
-  "domains": ["sensor"],
-  "country": ["DE", "AT", "CH"],
-  "homeassistant": "2024.1.0",
-  "iot_class": "cloud_polling"
+  "homeassistant": "2024.1.0"
 }
