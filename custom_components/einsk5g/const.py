@@ -15,7 +15,7 @@ AUTH0_CLIENT = "eyJuYW1lIjoiYXV0aDAtc3BhLWpzIiwidmVyc2lvbiI6IjIuMC44In0="
 
 # Update interval
 SCAN_INTERVAL = timedelta(seconds=10)
-HISTORY_SCAN_INTERVAL = timedelta(hours=1)
+HISTORY_SCAN_INTERVAL = timedelta(minutes=15)
 
 # Config keys
 CONF_USERNAME = "username"
@@ -45,9 +45,16 @@ SENSOR_TYPES = {
         "device_class": "power",
         "state_class": "measurement",
     },
-    "battery": {
-        "name": "Batterie",
-        "icon": "mdi:battery",
+    "battery_charge": {
+        "name": "Batterie Ladung",
+        "icon": "mdi:battery-charging",
+        "unit": "W",
+        "device_class": "power",
+        "state_class": "measurement",
+    },
+    "battery_discharge": {
+        "name": "Batterie Entladung",
+        "icon": "mdi:battery-minus",
         "unit": "W",
         "device_class": "power",
         "state_class": "measurement",

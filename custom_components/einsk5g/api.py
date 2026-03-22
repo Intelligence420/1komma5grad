@@ -236,11 +236,11 @@ class EinsK5GApi:
 
     async def _ensure_authenticated(self) -> None:
         """Ensure we have a valid access token."""
-        if (
-            self._access_token is None
-            or self._token_expiry is None
-            or datetime.now() >= self._token_expiry
-        ):
+        if self._access_token is None or self._token_expiry is None:
+            _LOGGER.info("No access token, authenticating...")
+            await self.authenticate()
+        elif datetime.now() >= self._token_expiry:
+            _LOGGER.info("Access token expired, refreshing...")
             await self.authenticate()
 
     async def _api_request(
@@ -262,18 +262,22 @@ class EinsK5GApi:
 
         async with session.request(method, url, headers=headers, **kwargs) as response:
             if response.status == 401:
-                # Token expired, try to re-authenticate
+                # Token expired or invalid, re-authenticate
+                _LOGGER.info("API returned 401, refreshing token...")
                 self._access_token = None
+                self._token_expiry = None
                 await self._ensure_authenticated()
                 headers["authorization"] = f"Bearer {self._access_token}"
 
                 async with session.request(method, url, headers=headers, **kwargs) as retry_response:
                     if retry_response.status != 200:
-                        raise EinsK5GApiError(f"API request failed: {retry_response.status}")
+                        text = await retry_response.text()
+                        raise EinsK5GApiError(f"API request failed after token refresh: {retry_response.status} - {text}")
                     return await retry_response.json()
 
             if response.status != 200:
-                raise EinsK5GApiError(f"API request failed: {response.status}")
+                text = await response.text()
+                raise EinsK5GApiError(f"API request failed: {response.status} - {text}")
 
             return await response.json()
 
