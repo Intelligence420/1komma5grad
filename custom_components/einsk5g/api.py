@@ -339,7 +339,7 @@ class EinsK5GApi:
             system_id: System ID (uses default if not provided)
             start_date: Start date for history
             end_date: End date for history
-            resolution: Data resolution (hour, day, month, year)
+            resolution: Data resolution (15m, hour, day, month, year)
         """
         if system_id is None:
             system_id = await self.get_system_id()
@@ -347,10 +347,10 @@ class EinsK5GApi:
         if end_date is None:
             end_date = datetime.now()
         if start_date is None:
-            start_date = end_date - timedelta(days=30)
+            start_date = end_date - timedelta(days=1)
 
         url = (
-            f"{HEARTBEAT_URL}/api/v3/systems/{system_id}/history?"
+            f"{HEARTBEAT_URL}/api/v3/systems/{system_id}/energy-historical?"
             f"from={start_date.strftime('%Y-%m-%d')}&"
             f"to={end_date.strftime('%Y-%m-%d')}&"
             f"resolution={resolution}"

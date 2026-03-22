@@ -104,61 +104,62 @@ SENSOR_TYPES = {
 }
 
 # Energy sensor types (for historical data - kWh)
+# Using state_class "total" since these are daily energy values
 ENERGY_SENSOR_TYPES = {
     "photovoltaic_energy": {
-        "name": "Photovoltaik Energie",
+        "name": "Photovoltaik Energie Heute",
         "icon": "mdi:solar-power",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "grid_consumption_energy": {
-        "name": "Netzbezug Energie",
+        "name": "Netzbezug Energie Heute",
         "icon": "mdi:transmission-tower-import",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "grid_feedin_energy": {
-        "name": "Netzeinspeisung Energie",
+        "name": "Netzeinspeisung Energie Heute",
         "icon": "mdi:transmission-tower-export",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "battery_charge_energy": {
-        "name": "Batterie Ladung Energie",
+        "name": "Batterie Ladung Energie Heute",
         "icon": "mdi:battery-charging",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "battery_discharge_energy": {
-        "name": "Batterie Entladung Energie",
+        "name": "Batterie Entladung Energie Heute",
         "icon": "mdi:battery-minus",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "heat_pump_energy": {
-        "name": "Waermepumpe Energie",
+        "name": "Waermepumpe Energie Heute",
         "icon": "mdi:heat-pump",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "wallbox_energy": {
-        "name": "Wallbox Energie",
+        "name": "Wallbox Energie Heute",
         "icon": "mdi:ev-station",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
     "household_energy": {
-        "name": "Haushalt Energie",
+        "name": "Haushalt Energie Heute",
         "icon": "mdi:home-lightning-bolt",
         "unit": "kWh",
         "device_class": "energy",
-        "state_class": "total_increasing",
+        "state_class": "total",
     },
 }

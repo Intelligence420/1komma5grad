@@ -44,21 +44,24 @@ class EinsK5GDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Parse the live data into sensor values
             data = self._parse_live_data(live_data)
 
-            # Update history data periodically (every hour)
+            # Update history data periodically (every 15 minutes for more accurate daily totals)
             now = datetime.now()
             if (
                 self._last_history_update is None
-                or now - self._last_history_update > timedelta(hours=1)
+                or now - self._last_history_update > timedelta(minutes=15)
             ):
                 try:
+                    # Fetch today's data (use today's date for both from and to)
+                    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
                     history = await self.api.get_history(
                         self.system_id,
-                        start_date=now - timedelta(days=1),
-                        end_date=now,
+                        start_date=today,
+                        end_date=today,
                         resolution="day",
                     )
                     self._history_data = self._parse_history_data(history)
                     self._last_history_update = now
+                    _LOGGER.debug("History data updated: %s", self._history_data)
                 except EinsK5GApiError as err:
                     _LOGGER.warning("Failed to fetch history data: %s", err)
 
@@ -90,9 +93,12 @@ class EinsK5GDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         result["grid_feedin"] = grid_feedin.get("value", 0) if isinstance(grid_feedin, dict) else grid_feedin
 
         # Battery from summaryCards
+        # Note: API returns negative values for charging, positive for discharging
+        # We invert this for Home Assistant (positive = charging, negative = discharging)
         battery_data = summary_cards.get("battery", {})
         battery_power = battery_data.get("power", {})
-        result["battery"] = battery_power.get("value", 0) if isinstance(battery_power, dict) else battery_power
+        battery_value = battery_power.get("value", 0) if isinstance(battery_power, dict) else battery_power
+        result["battery"] = -battery_value  # Invert: positive = charging
         # State of charge (convert from 0-1 to 0-100%)
         soc = battery_data.get("stateOfCharge", hero_view.get("totalStateOfCharge", 0))
         result["battery_soc"] = round(soc * 100, 1) if soc <= 1 else soc
@@ -153,33 +159,76 @@ class EinsK5GDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Parse historical data into energy values."""
         result: dict[str, Any] = {}
 
-        # Extract cumulative energy values (in kWh)
-        if "totals" in data:
-            totals = data["totals"]
+        # Extract energy values from the new API structure (in kWh)
+        # energyProduced -> photovoltaic_energy
+        if "energyProduced" in data:
+            energy_produced = data["energyProduced"]
+            if isinstance(energy_produced, dict):
+                result["photovoltaic_energy"] = energy_produced.get("value", 0)
+            else:
+                result["photovoltaic_energy"] = energy_produced or 0
 
-            if "photovoltaic" in totals:
-                result["photovoltaic_energy"] = totals["photovoltaic"].get("energy", 0)
+        # grid.supply -> grid_consumption_energy (energy from grid)
+        # grid.feedIn -> grid_feedin_energy (energy to grid)
+        grid = data.get("grid", {})
+        if "supply" in grid:
+            supply = grid["supply"]
+            if isinstance(supply, dict):
+                result["grid_consumption_energy"] = supply.get("value", 0)
+            else:
+                result["grid_consumption_energy"] = supply or 0
 
-            if "gridConsumption" in totals:
-                result["grid_consumption_energy"] = totals["gridConsumption"].get("energy", 0)
+        if "feedIn" in grid:
+            feed_in = grid["feedIn"]
+            if isinstance(feed_in, dict):
+                result["grid_feedin_energy"] = feed_in.get("value", 0)
+            else:
+                result["grid_feedin_energy"] = feed_in or 0
 
-            if "gridFeedIn" in totals:
-                result["grid_feedin_energy"] = totals["gridFeedIn"].get("energy", 0)
+        # battery.charge -> battery_charge_energy
+        # battery.discharge -> battery_discharge_energy
+        battery = data.get("battery", {})
+        if "charge" in battery:
+            charge = battery["charge"]
+            if isinstance(charge, dict):
+                result["battery_charge_energy"] = charge.get("value", 0)
+            else:
+                result["battery_charge_energy"] = charge or 0
 
-            if "batteryCharge" in totals:
-                result["battery_charge_energy"] = totals["batteryCharge"].get("energy", 0)
+        if "discharge" in battery:
+            discharge = battery["discharge"]
+            if isinstance(discharge, dict):
+                result["battery_discharge_energy"] = discharge.get("value", 0)
+            else:
+                result["battery_discharge_energy"] = discharge or 0
 
-            if "batteryDischarge" in totals:
-                result["battery_discharge_energy"] = totals["batteryDischarge"].get("energy", 0)
+        # consumption.consumers for individual device energy
+        consumption = data.get("consumption", {})
+        consumers = consumption.get("consumers", {})
 
-            if "heatPump" in totals:
-                result["heat_pump_energy"] = totals["heatPump"].get("energy", 0)
+        # Heat pump energy
+        if "heatPump" in consumers:
+            hp = consumers["heatPump"]
+            if isinstance(hp, dict):
+                result["heat_pump_energy"] = hp.get("value", 0)
+            else:
+                result["heat_pump_energy"] = hp or 0
 
-            if "wallbox" in totals:
-                result["wallbox_energy"] = totals["wallbox"].get("energy", 0)
+        # EV/Wallbox energy
+        if "ev" in consumers:
+            ev = consumers["ev"]
+            if isinstance(ev, dict):
+                result["wallbox_energy"] = ev.get("value", 0)
+            else:
+                result["wallbox_energy"] = ev or 0
 
-            if "household" in totals:
-                result["household_energy"] = totals["household"].get("energy", 0)
+        # Household energy
+        if "household" in consumers:
+            household = consumers["household"]
+            if isinstance(household, dict):
+                result["household_energy"] = household.get("value", 0)
+            else:
+                result["household_energy"] = household or 0
 
         return result
 

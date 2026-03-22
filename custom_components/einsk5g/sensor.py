@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -15,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, ENERGY_SENSOR_TYPES, MANUFACTURER, SENSOR_TYPES
 from .coordinator import EinsK5GDataUpdateCoordinator
@@ -145,11 +147,11 @@ class EinsK5GEnergySensor(EinsK5GSensorBase):
     def native_value(self) -> float | None:
         """Return the state of the sensor."""
         if self.coordinator.data is None:
-            return None
+            return 0.0
 
         value = self.coordinator.data.get(self._sensor_type)
         if value is None:
-            return None
+            return 0.0
 
         # Energy values should be in kWh, round to 2 decimal places
         return round(float(value), 2)
@@ -158,3 +160,10 @@ class EinsK5GEnergySensor(EinsK5GSensorBase):
     def native_unit_of_measurement(self) -> str:
         """Return the unit of measurement."""
         return UnitOfEnergy.KILO_WATT_HOUR
+
+    @property
+    def last_reset(self) -> datetime | None:
+        """Return the time when the sensor was last reset (start of today)."""
+        # Daily energy values reset at midnight
+        now = dt_util.now()
+        return dt_util.start_of_local_day(now)
